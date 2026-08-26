@@ -1,11 +1,91 @@
 create extension if not exists pgcrypto;
-create table if not exists public.bookings (id uuid primary key default gen_random_uuid(),booking_date date not null,slot text not null check(slot in ('day','evening')),name text not null check(char_length(trim(name)) between 1 and 80),email text not null check(char_length(trim(email)) between 3 and 160),purpose text,series_id uuid,created_at timestamptz not null default now(),constraint one_booking_per_slot unique(booking_date,slot));
+
+create table if not exists public.bookings (
+  id uuid primary key default gen_random_uuid(),
+  booking_date date not null,
+  slot text not null check(slot in ('day','evening')),
+  name text not null check(char_length(trim(name)) between 1 and 80),
+  email text not null check(char_length(trim(email)) between 3 and 160),
+  purpose text,
+  series_id uuid,
+  created_at timestamptz not null default now(),
+  constraint one_booking_per_slot unique(booking_date,slot)
+);
+
 alter table public.bookings enable row level security;
 revoke all on table public.bookings from anon, authenticated;
+
 drop view if exists public.public_bookings;
-create view public.public_bookings with (security_invoker=false) as select id,booking_date,slot,name,purpose,series_id,created_at from public.bookings;
+create view public.public_bookings with (security_invoker=false) as
+select id,booking_date,slot,name,purpose,series_id,created_at
+from public.bookings;
+
 revoke all on table public.public_bookings from anon, authenticated;
 grant select on table public.public_bookings to anon, authenticated;
-create or replace function public.create_booking_series(p_name text,p_email text,p_purpose text,p_start_date date,p_slot text,p_repeat_weekly boolean default false,p_end_date date default null) returns integer language plpgsql security definer set search_path=public as $$ declare d date; final_date date; sid uuid:=gen_random_uuid(); count_added integer:=0; begin if trim(coalesce(p_name,''))='' then raise exception 'Name is required'; end if; if trim(coalesce(p_email,''))='' then raise exception 'Email is required'; end if; if p_slot not in ('day','evening') then raise exception 'Invalid slot'; end if; if p_start_date<current_date then raise exception 'Bookings cannot start in the past'; end if; final_date:=case when p_repeat_weekly then coalesce(p_end_date,p_start_date) else p_start_date end; if final_date<p_start_date then raise exception 'End date must be on or after the start date'; end if; if final_date>p_start_date+interval '2 years' then raise exception 'Recurring bookings can run for at most 2 years'; end if; d:=p_start_date; while d<=final_date loop if exists(select 1 from public.bookings b where b.booking_date=d and b.slot=p_slot) then raise exception 'The % slot on % is already booked',p_slot,to_char(d,'DD Mon YYYY'); end if; exit when not p_repeat_weekly; d:=d+7; end loop; d:=p_start_date; while d<=final_date loop insert into public.bookings(booking_date,slot,name,email,purpose,series_id) values(d,p_slot,trim(p_name),trim(p_email),nullif(trim(coalesce(p_purpose,'')),''),case when p_repeat_weekly then sid else null end); count_added:=count_added+1; exit when not p_repeat_weekly; d:=d+7; end loop; return count_added; end; $$;
+
+create or replace function public.create_booking_series(
+  p_name text,
+  p_email text,
+  p_purpose text,
+  p_start_date date,
+  p_slot text,
+  p_repeat_weekly boolean default false,
+  p_end_date date default null
+)
+returns integer
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  d date;
+  final_date date;
+  sid uuid:=gen_random_uuid();
+  count_added integer:=0;
+begin
+  if trim(coalesce(p_name,''))='' then raise exception 'Name is required'; end if;
+  if trim(coalesce(p_email,''))='' then raise exception 'Email is required'; end if;
+  if p_slot not in ('day','evening','full_day') then raise exception 'Invalid slot'; end if;
+  if p_start_date<current_date then raise exception 'Bookings cannot start in the past'; end if;
+
+  final_date:=case when p_repeat_weekly then coalesce(p_end_date,p_start_date) else p_start_date end;
+  if final_date<p_start_date then raise exception 'End date must be on or after the start date'; end if;
+  if final_date>p_start_date+interval '2 years' then raise exception 'Recurring bookings can run for at most 2 years'; end if;
+
+  d:=p_start_date;
+  while d<=final_date loop
+    if p_slot='full_day' then
+      if exists(select 1 from public.bookings b where b.booking_date=d and b.slot in ('day','evening')) then
+        raise exception 'The full day on % is not available because at least one slot is already booked',to_char(d,'DD Mon YYYY');
+      end if;
+    else
+      if exists(select 1 from public.bookings b where b.booking_date=d and b.slot=p_slot) then
+        raise exception 'The % slot on % is already booked',p_slot,to_char(d,'DD Mon YYYY');
+      end if;
+    end if;
+    exit when not p_repeat_weekly;
+    d:=d+7;
+  end loop;
+
+  d:=p_start_date;
+  while d<=final_date loop
+    if p_slot='full_day' then
+      insert into public.bookings(booking_date,slot,name,email,purpose,series_id)
+      values
+        (d,'day',trim(p_name),trim(p_email),nullif(trim(coalesce(p_purpose,'')),''),sid),
+        (d,'evening',trim(p_name),trim(p_email),nullif(trim(coalesce(p_purpose,'')),''),sid);
+    else
+      insert into public.bookings(booking_date,slot,name,email,purpose,series_id)
+      values(d,p_slot,trim(p_name),trim(p_email),nullif(trim(coalesce(p_purpose,'')),''),case when p_repeat_weekly then sid else null end);
+    end if;
+    count_added:=count_added+1;
+    exit when not p_repeat_weekly;
+    d:=d+7;
+  end loop;
+
+  return count_added;
+end;
+$$;
+
 revoke all on function public.create_booking_series(text,text,text,date,text,boolean,date) from public;
 grant execute on function public.create_booking_series(text,text,text,date,text,boolean,date) to anon, authenticated;
