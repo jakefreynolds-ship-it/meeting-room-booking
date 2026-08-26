@@ -12,7 +12,7 @@
       <div>
         <p class="eyebrow">ONE ROOM · DAY, EVENING OR FULL DAY</p>
         <h1>Meeting Room Booking</h1>
-        <p class="sub">Book a day, evening, or the full day. Click an existing booking to edit it using the original booking email.</p>
+        <p class="sub">Book a day, evening, or the full day. Click an existing booking to edit or cancel it using the original booking email.</p>
       </div>
       <span id="status" class="status">Connecting…</span>
     </header>
@@ -57,6 +57,15 @@
           <button id="submitBtn" type="submit">Confirm booking</button>
           <button type="button" id="cancel" class="secondary">Cancel</button>
         </div>
+
+        <div id="deleteBox" class="delete-box hidden">
+          <h3>Cancel this booking</h3>
+          <p>Enter the original booking email above, then choose what to remove.</p>
+          <label class="radio-row"><input type="radio" name="deleteScope" id="deleteThis" value="this" checked><span>Delete this date only</span></label>
+          <label id="deleteSeriesRow" class="radio-row hidden"><input type="radio" name="deleteScope" id="deleteSeries" value="series"><span>Delete all dates in this recurring series</span></label>
+          <button type="button" id="deleteBtn" class="danger">Delete booking</button>
+        </div>
+
         <p id="formMessage" class="message"></p>
       </form>
     </section>
@@ -72,7 +81,7 @@
       <div class="table-wrap"><table><thead><tr><th>Person</th><th>Day</th><th>Evening</th><th>Total</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     </section>
 
-    <footer><p>Contact emails are kept private. Editing requires the same email address used for the original booking.</p></footer>
+    <footer><p>Contact emails are kept private. Editing or deleting requires the same email address used for the original booking.</p></footer>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
