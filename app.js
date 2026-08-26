@@ -112,17 +112,34 @@ function renderStats(){
   const daysInMonth=new Date(cursor.getFullYear(),cursor.getMonth()+1,0).getDate();
   const body=$("statsBody"); body.innerHTML="";
   const map={};
+  let bookedDaySlots=0;
+  let bookedEveningSlots=0;
+
   (monthBookings||[]).forEach(b=>{
-    const k=b.name.trim(); map[k]??={day:0,evening:0};
-    if(b.slot==="day") map[k].day+=0.5;
-    if(b.slot==="evening") map[k].evening+=0.5;
+    const k=b.name.trim();
+    map[k]??={day:0,evening:0};
+    if(b.slot==="day"){
+      map[k].day+=0.5;
+      bookedDaySlots++;
+    }
+    if(b.slot==="evening"){
+      map[k].evening+=0.5;
+      bookedEveningSlots++;
+    }
   });
-  const rows=Object.entries(map).map(([name,x])=>({name,...x,total:x.day+x.evening})).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
-  if(!rows.length){ body.innerHTML='<tr><td colspan="5">No bookings this month.</td></tr>'; return; }
+
+  const rows=Object.entries(map)
+    .map(([name,x])=>({name,...x,total:x.day+x.evening}))
+    .sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
+
   rows.forEach(r=>{
-    const unused=Math.max(0,daysInMonth-r.total);
-    body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip ${nameColorClass(r.name)}">${esc(r.name)}</span></td><td>${r.day}</td><td>${r.evening}</td><td><b>${r.total}</b></td><td>${unused}</td></tr>`);
+    body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip ${nameColorClass(r.name)}">${esc(r.name)}</span></td><td>${r.day}</td><td>${r.evening}</td><td><b>${r.total}</b></td></tr>`);
   });
+
+  const unusedDay=(daysInMonth-bookedDaySlots)*0.5;
+  const unusedEvening=(daysInMonth-bookedEveningSlots)*0.5;
+  const unusedTotal=unusedDay+unusedEvening;
+  body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip person-unused">Unused</span></td><td>${unusedDay}</td><td>${unusedEvening}</td><td><b>${unusedTotal}</b></td></tr>`);
 }
 
 function resetFormMode(){
