@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Meeting Room Booking</title>
+  <title>Studio 7 Bookings</title>
   <link rel="stylesheet" href="styles.css?v=20260826-2">
 </head>
 <body>
@@ -11,7 +11,7 @@
     <header class="hero">
       <div>
         <p class="eyebrow">ONE ROOM · DAY, EVENING OR FULL DAY</p>
-        <h1>Meeting Room Booking</h1>
+        <h1>Studio 7 Bookings</h1>
         <p class="sub">Book a day, evening, or the full day. Click an existing booking to edit or cancel it using the original booking email.</p>
       </div>
       <span id="status" class="status">Connecting…</span>
@@ -40,24 +40,19 @@
             </select>
           </label>
         </div>
-
         <div class="two">
           <label>Name<input id="name" required maxlength="80"></label>
           <label><span id="emailLabel">Email / contact</span><input id="email" type="email" required maxlength="160"></label>
         </div>
-
         <label>Purpose (optional)<input id="purpose" maxlength="160" placeholder="e.g. Committee meeting"></label>
-
         <div id="repeatBox" class="repeat-box">
           <label class="check"><input id="weekly" type="checkbox"><span>Repeat every week</span></label>
           <label id="endDateWrap" class="hidden">Repeat until<input id="endDate" type="date"></label>
         </div>
-
         <div class="actions">
           <button id="submitBtn" type="submit">Confirm booking</button>
           <button type="button" id="cancel" class="secondary">Cancel</button>
         </div>
-
         <div id="deleteBox" class="delete-box hidden">
           <h3>Cancel this booking</h3>
           <p>Enter the original booking email above, then choose what to remove.</p>
@@ -65,24 +60,19 @@
           <label id="deleteSeriesRow" class="radio-row hidden"><input type="radio" name="deleteScope" id="deleteSeries" value="series"><span>Delete all dates in this recurring series</span></label>
           <button type="button" id="deleteBtn" class="danger">Delete booking</button>
         </div>
-
         <p id="formMessage" class="message"></p>
       </form>
     </section>
 
     <section class="card">
-      <div class="section-head">
-        <div>
-          <h2>Monthly usage — <span id="statsMonthLabel"></span></h2>
-          <p>Day = 0.5, Evening = 0.5, Full day = 1. Unused days = number of days in the selected calendar month minus total usage.</p>
-        </div>
-      </div>
+      <div class="section-head"><div>
+        <h2>Monthly usage — <span id="statsMonthLabel"></span></h2>
+        <p>Day = 0.5, Evening = 0.5, Full day = 1. Unused days = number of days in the selected calendar month minus total usage.</p>
+      </div></div>
       <div class="table-wrap"><table><thead><tr><th>Person</th><th>Day</th><th>Evening</th><th>Total</th><th>Unused days</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     </section>
-
     <footer><p>Contact emails are kept private. Editing or deleting requires the same email address used for the original booking.</p></footer>
   </main>
-
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="config.js?v=20260826-2"></script>
   <script src="app.js?v=20260826-2"></script>
