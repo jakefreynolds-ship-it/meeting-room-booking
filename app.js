@@ -3,10 +3,14 @@ const SLOT_LABELS = {
   evening: "Evening (17:00–22:00)",
   full_day: "Full day (Day + Evening)"
 };
+
 let client = null;
 let cursor = new Date(); cursor.setDate(1);
 let selected = null;
+let editing = null;
+let mode = "create";
 let monthBookings = [];
+
 const $ = id => document.getElementById(id);
 const dateKey = d => { const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; };
 const fmt = d => new Date(d+"T12:00:00").toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
@@ -50,38 +54,80 @@ function renderCalendar(){
     const past=date<dateKey(new Date());
     const dayBooking=monthBookings.find(b=>b.booking_date===date&&b.slot==="day");
     const eveBooking=monthBookings.find(b=>b.booking_date===date&&b.slot==="evening");
+    const pairedFullDay=!!(dayBooking&&eveBooking&&dayBooking.series_id&&dayBooking.series_id===eveBooking.series_id);
 
     ["day","evening"].forEach(slot=>{
       const found=slot==="day"?dayBooking:eveBooking;
       const btn=document.createElement("button");
-      btn.className="slot "+(found?"booked":past?"past":"free");
-      btn.disabled=!!found||past||!client;
-      btn.innerHTML=found?`${slot==="day"?"☀":"🌙"} ${esc(found.name)}`:past?"Unavailable":`${slot==="day"?"☀ Day":"🌙 Evening"}`;
-      if(!btn.disabled) btn.onclick=()=>openForm(date,slot);
+      if(found){
+        btn.className="slot booked editable";
+        btn.disabled=!client;
+        btn.innerHTML=`${slot==="day"?"☀":"🌙"} ${esc(found.name)} · Edit`;
+        if(client) btn.onclick=()=>openEditForm(found,pairedFullDay);
+      } else {
+        btn.className="slot "+(past?"past":"free");
+        btn.disabled=past||!client;
+        btn.textContent=past?"Unavailable":(slot==="day"?"☀ Day":"🌙 Evening");
+        if(!btn.disabled) btn.onclick=()=>openCreateForm(date,slot);
+      }
       slots.appendChild(btn);
     });
 
     const full=document.createElement("button");
-    const fullUnavailable=!!dayBooking||!!eveBooking||past||!client;
-    full.className="slot "+(fullUnavailable?(past?"past":"booked"):"free");
-    full.disabled=fullUnavailable;
-    full.textContent=past?"Full day unavailable":(dayBooking||eveBooking)?"Full day unavailable":"◉ Full day";
-    if(!full.disabled) full.onclick=()=>openForm(date,"full_day");
+    if(pairedFullDay){
+      full.className="slot booked editable";
+      full.disabled=!client;
+      full.textContent=`◉ Full day · ${dayBooking.name} · Edit`;
+      if(client) full.onclick=()=>openEditForm(dayBooking,true);
+    } else {
+      const fullUnavailable=!!dayBooking||!!eveBooking||past||!client;
+      full.className="slot "+(fullUnavailable?(past?"past":"booked"):"free");
+      full.disabled=fullUnavailable;
+      full.textContent=past?"Full day unavailable":(dayBooking||eveBooking)?"Full day unavailable":"◉ Full day";
+      if(!full.disabled) full.onclick=()=>openCreateForm(date,"full_day");
+    }
     slots.appendChild(full);
     cal.appendChild(div);
   }
 }
 
-function openForm(date,slot){
-  selected={date,slot};
-  $("formCard").classList.remove("hidden");
-  $("selectedSummary").textContent=`${fmt(date)} · ${SLOT_LABELS[slot]}`;
+function resetFormMode(){
+  $("bookingForm").reset();
   $("formMessage").textContent="";
-  $("weekly").checked=false;
+  $("formMessage").className="message";
   $("endDateWrap").classList.add("hidden");
-  $("endDate").value="";
+}
+
+function openCreateForm(date,slot){
+  mode="create"; editing=null; selected={date,slot}; resetFormMode();
+  $("formHeading").textContent="Book the room";
+  $("submitBtn").textContent="Confirm booking";
+  $("emailLabel").textContent="Email / contact";
+  $("editFields").classList.add("hidden");
+  $("repeatBox").classList.remove("hidden");
+  $("selectedSummary").textContent=`${fmt(date)} · ${SLOT_LABELS[slot]}`;
   $("endDate").min=date;
+  $("formCard").classList.remove("hidden");
   $("name").focus();
+  $("formCard").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function openEditForm(booking,isFullDay=false){
+  mode="edit"; selected=null; editing={id:booking.id,date:booking.booking_date,slot:isFullDay?"full_day":booking.slot}; resetFormMode();
+  $("formHeading").textContent="Edit booking";
+  $("submitBtn").textContent="Save changes";
+  $("emailLabel").textContent="Original booking email (required to edit)";
+  $("repeatBox").classList.add("hidden");
+  $("editFields").classList.remove("hidden");
+  $("editDate").value=booking.booking_date;
+  $("editDate").min=dateKey(new Date());
+  $("editSlot").value=editing.slot;
+  $("name").value=booking.name||"";
+  $("purpose").value=booking.purpose||"";
+  $("email").value="";
+  $("selectedSummary").textContent=`Editing ${fmt(booking.booking_date)} · ${SLOT_LABELS[editing.slot]}. Enter the original email to save changes.`;
+  $("formCard").classList.remove("hidden");
+  $("email").focus();
   $("formCard").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
@@ -91,17 +137,42 @@ $("weekly").onchange=e=>{
 };
 
 $("bookingForm").onsubmit=async e=>{
-  e.preventDefault(); if(!client||!selected)return;
-  const weekly=$("weekly").checked,end=weekly?$("endDate").value:selected.date;
-  if(weekly&&!end){ $("formMessage").className="message error"; $("formMessage").textContent="Choose an end date."; return; }
-  const submit=e.target.querySelector('button[type="submit"]'); submit.disabled=true;
+  e.preventDefault(); if(!client)return;
+  const submit=$("submitBtn"); submit.disabled=true;
   $("formMessage").className="message"; $("formMessage").textContent="Saving…";
-  const {data,error}=await client.rpc("create_booking_series",{p_name:$("name").value.trim(),p_email:$("email").value.trim(),p_purpose:$("purpose").value.trim()||null,p_start_date:selected.date,p_slot:selected.slot,p_repeat_weekly:weekly,p_end_date:end});
+
+  if(mode==="edit"){
+    const {error}=await client.rpc("edit_booking",{
+      p_booking_id:editing.id,
+      p_email:$("email").value.trim(),
+      p_new_name:$("name").value.trim(),
+      p_new_purpose:$("purpose").value.trim()||null,
+      p_new_date:$("editDate").value,
+      p_new_slot:$("editSlot").value
+    });
+    submit.disabled=false;
+    if(error){
+      $("formMessage").className="message error";
+      $("formMessage").textContent=error.message.includes("Email does not match")?"That email does not match the original booking.":error.message;
+      return;
+    }
+    $("formMessage").className="message ok"; $("formMessage").textContent="Booking updated.";
+    setTimeout(()=>$("formCard").classList.add("hidden"),700);
+    await refresh(); return;
+  }
+
+  if(!selected){ submit.disabled=false; return; }
+  const weekly=$("weekly").checked,end=weekly?$("endDate").value:selected.date;
+  if(weekly&&!end){ submit.disabled=false; $("formMessage").className="message error"; $("formMessage").textContent="Choose an end date."; return; }
+  const {data,error}=await client.rpc("create_booking_series",{
+    p_name:$("name").value.trim(),p_email:$("email").value.trim(),p_purpose:$("purpose").value.trim()||null,
+    p_start_date:selected.date,p_slot:selected.slot,p_repeat_weekly:weekly,p_end_date:end
+  });
   submit.disabled=false;
   if(error){ $("formMessage").className="message error"; $("formMessage").textContent=error.message; return; }
   $("formMessage").className="message ok";
   $("formMessage").textContent=`Booked ${data} date${data===1?"":"s"}${selected.slot==="full_day"?" as full day":""}.`;
-  e.target.reset(); $("endDateWrap").classList.add("hidden"); setTimeout(()=>$("formCard").classList.add("hidden"),700); await refresh();
+  setTimeout(()=>$("formCard").classList.add("hidden"),700); await refresh();
 };
 
 async function loadStats(){
