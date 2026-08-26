@@ -15,6 +15,15 @@ const $ = id => document.getElementById(id);
 const dateKey = d => { const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),day=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${day}`; };
 const fmt = d => new Date(d+"T12:00:00").toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+const nameColorClass = name => {
+  switch(String(name||"").trim().toLowerCase()){
+    case "lewis": return "person-lewis";
+    case "jack": return "person-jack";
+    case "jake": return "person-jake";
+    case "jonah": return "person-jonah";
+    default: return "person-other";
+  }
+};
 function setStatus(text,kind=""){ $("status").textContent=text; $("status").className="status "+kind; }
 
 async function init(){
@@ -56,37 +65,46 @@ function renderCalendar(){
     const eveBooking=monthBookings.find(b=>b.booking_date===date&&b.slot==="evening");
     const pairedFullDay=!!(dayBooking&&eveBooking&&dayBooking.series_id&&dayBooking.series_id===eveBooking.series_id);
 
-    ["day","evening"].forEach(slot=>{
-      const found=slot==="day"?dayBooking:eveBooking;
-      const btn=document.createElement("button");
-      if(found){
-        btn.className="slot booked editable";
-        btn.disabled=!client;
-        btn.innerHTML=`${slot==="day"?"☀":"🌙"} ${esc(found.name)} · Edit`;
-        if(client) btn.onclick=()=>openEditForm(found,pairedFullDay);
-      } else {
-        btn.className="slot "+(past?"past":"free");
-        btn.disabled=past||!client;
-        btn.textContent=past?"Unavailable":(slot==="day"?"☀ Day":"🌙 Evening");
-        if(!btn.disabled) btn.onclick=()=>openCreateForm(date,slot);
-      }
-      slots.appendChild(btn);
-    });
-
-    const full=document.createElement("button");
+    // A real full-day booking is shown as one item only; the underlying day/evening rows stay hidden.
     if(pairedFullDay){
-      full.className="slot booked editable";
+      const full=document.createElement("button");
+      full.className=`slot booked editable ${nameColorClass(dayBooking.name)}`;
       full.disabled=!client;
       full.textContent=`◉ Full day · ${dayBooking.name} · Edit`;
       if(client) full.onclick=()=>openEditForm(dayBooking,true);
-    } else {
-      const fullUnavailable=!!dayBooking||!!eveBooking||past||!client;
-      full.className="slot "+(fullUnavailable?(past?"past":"booked"):"free");
-      full.disabled=fullUnavailable;
-      full.textContent=past?"Full day unavailable":(dayBooking||eveBooking)?"Full day unavailable":"◉ Full day";
-      if(!full.disabled) full.onclick=()=>openCreateForm(date,"full_day");
+      slots.appendChild(full);
+      cal.appendChild(div);
+      continue;
     }
-    slots.appendChild(full);
+
+    // Show booked half-day slots. Show free alternatives only for future dates.
+    ["day","evening"].forEach(slot=>{
+      const found=slot==="day"?dayBooking:eveBooking;
+      if(found){
+        const btn=document.createElement("button");
+        btn.className=`slot booked editable ${nameColorClass(found.name)}`;
+        btn.disabled=!client;
+        btn.innerHTML=`${slot==="day"?"☀":"🌙"} ${esc(found.name)} · Edit`;
+        if(client) btn.onclick=()=>openEditForm(found,false);
+        slots.appendChild(btn);
+      } else if(!past && client){
+        const btn=document.createElement("button");
+        btn.className="slot free";
+        btn.textContent=slot==="day"?"☀ Day":"🌙 Evening";
+        btn.onclick=()=>openCreateForm(date,slot);
+        slots.appendChild(btn);
+      }
+    });
+
+    // Full day only appears when both half-day slots are genuinely available.
+    if(!past && client && !dayBooking && !eveBooking){
+      const full=document.createElement("button");
+      full.className="slot free";
+      full.textContent="◉ Full day";
+      full.onclick=()=>openCreateForm(date,"full_day");
+      slots.appendChild(full);
+    }
+
     cal.appendChild(div);
   }
 }
@@ -185,7 +203,7 @@ async function loadStats(){
   (data||[]).forEach(b=>{ const k=b.name.trim(); map[k]??={day:0,evening:0}; if(b.slot==="day")map[k].day+=0.5; if(b.slot==="evening")map[k].evening+=0.5; });
   const rows=Object.entries(map).map(([name,x])=>({name,...x,total:x.day+x.evening})).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
   if(!rows.length){ body.innerHTML='<tr><td colspan="4">No bookings this month.</td></tr>'; return; }
-  rows.forEach(r=>body.insertAdjacentHTML("beforeend",`<tr><td>${esc(r.name)}</td><td>${r.day}</td><td>${r.evening}</td><td><b>${r.total}</b></td></tr>`));
+  rows.forEach(r=>body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip ${nameColorClass(r.name)}">${esc(r.name)}</span></td><td>${r.day}</td><td>${r.evening}</td><td><b>${r.total}</b></td></tr>`));
 }
 
 $("statsMonth").onchange=loadStats;
