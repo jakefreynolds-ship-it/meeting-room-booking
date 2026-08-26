@@ -89,3 +89,90 @@ $$;
 
 revoke all on function public.create_booking_series(text,text,text,date,text,boolean,date) from public;
 grant execute on function public.create_booking_series(text,text,text,date,text,boolean,date) to anon, authenticated;
+
+create or replace function public.edit_booking(
+  p_booking_id uuid,
+  p_email text,
+  p_new_name text,
+  p_new_purpose text,
+  p_new_date date,
+  p_new_slot text
+)
+returns integer
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  target public.bookings%rowtype;
+  target_ids uuid[];
+  pair_count integer:=0;
+  stored_email text;
+  new_sid uuid;
+begin
+  select * into target from public.bookings where id=p_booking_id;
+  if not found then raise exception 'Booking not found'; end if;
+
+  if lower(trim(coalesce(p_email,''))) <> lower(trim(target.email)) then
+    raise exception 'Email does not match this booking';
+  end if;
+
+  if trim(coalesce(p_new_name,''))='' then raise exception 'Name is required'; end if;
+  if p_new_slot not in ('day','evening','full_day') then raise exception 'Invalid booking type'; end if;
+  if p_new_date<current_date then raise exception 'Bookings cannot be moved into the past'; end if;
+
+  stored_email:=target.email;
+  target_ids:=array[target.id];
+
+  if target.series_id is not null then
+    select count(*), array_agg(id)
+      into pair_count, target_ids
+    from public.bookings
+    where booking_date=target.booking_date
+      and series_id=target.series_id
+      and slot in ('day','evening');
+
+    if pair_count<>2 then
+      target_ids:=array[target.id];
+    end if;
+  end if;
+
+  if p_new_slot='full_day' then
+    if exists(
+      select 1 from public.bookings b
+      where b.booking_date=p_new_date
+        and b.slot in ('day','evening')
+        and not (b.id=any(target_ids))
+    ) then
+      raise exception 'That full day is not available';
+    end if;
+  else
+    if exists(
+      select 1 from public.bookings b
+      where b.booking_date=p_new_date
+        and b.slot=p_new_slot
+        and not (b.id=any(target_ids))
+    ) then
+      raise exception 'That slot is already booked';
+    end if;
+  end if;
+
+  delete from public.bookings where id=any(target_ids);
+
+  if p_new_slot='full_day' then
+    new_sid:=gen_random_uuid();
+    insert into public.bookings(booking_date,slot,name,email,purpose,series_id)
+    values
+      (p_new_date,'day',trim(p_new_name),stored_email,nullif(trim(coalesce(p_new_purpose,'')),''),new_sid),
+      (p_new_date,'evening',trim(p_new_name),stored_email,nullif(trim(coalesce(p_new_purpose,'')),''),new_sid);
+  else
+    insert into public.bookings(booking_date,slot,name,email,purpose,series_id)
+    values(p_new_date,p_new_slot,trim(p_new_name),stored_email,nullif(trim(coalesce(p_new_purpose,'')),''),null);
+  end if;
+
+  return 1;
+end;
+$$;
+
+revoke all on function public.edit_booking(uuid,text,text,text,date,text) from public;
+grant execute on function public.edit_booking(uuid,text,text,text,date,text) to anon, authenticated;
