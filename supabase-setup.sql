@@ -132,27 +132,15 @@ begin
       and series_id=target.series_id
       and slot in ('day','evening');
 
-    if pair_count<>2 then
-      target_ids:=array[target.id];
-    end if;
+    if pair_count<>2 then target_ids:=array[target.id]; end if;
   end if;
 
   if p_new_slot='full_day' then
-    if exists(
-      select 1 from public.bookings b
-      where b.booking_date=p_new_date
-        and b.slot in ('day','evening')
-        and not (b.id=any(target_ids))
-    ) then
+    if exists(select 1 from public.bookings b where b.booking_date=p_new_date and b.slot in ('day','evening') and not (b.id=any(target_ids))) then
       raise exception 'That full day is not available';
     end if;
   else
-    if exists(
-      select 1 from public.bookings b
-      where b.booking_date=p_new_date
-        and b.slot=p_new_slot
-        and not (b.id=any(target_ids))
-    ) then
+    if exists(select 1 from public.bookings b where b.booking_date=p_new_date and b.slot=p_new_slot and not (b.id=any(target_ids))) then
       raise exception 'That slot is already booked';
     end if;
   end if;
@@ -176,3 +164,48 @@ $$;
 
 revoke all on function public.edit_booking(uuid,text,text,text,date,text) from public;
 grant execute on function public.edit_booking(uuid,text,text,text,date,text) to anon, authenticated;
+
+create or replace function public.delete_booking(
+  p_booking_id uuid,
+  p_email text,
+  p_delete_series boolean default false
+)
+returns integer
+language plpgsql
+security definer
+set search_path=public
+as $$
+declare
+  target public.bookings%rowtype;
+  deleted_count integer:=0;
+begin
+  select * into target from public.bookings where id=p_booking_id;
+  if not found then raise exception 'Booking not found'; end if;
+
+  if lower(trim(coalesce(p_email,''))) <> lower(trim(target.email)) then
+    raise exception 'Email does not match this booking';
+  end if;
+
+  if p_delete_series and target.series_id is not null then
+    delete from public.bookings where series_id=target.series_id;
+    get diagnostics deleted_count = row_count;
+  elsif target.series_id is not null and exists(
+    select 1 from public.bookings b
+    where b.series_id=target.series_id
+      and b.booking_date=target.booking_date
+      and b.id<>target.id
+  ) then
+    delete from public.bookings
+    where series_id=target.series_id and booking_date=target.booking_date;
+    get diagnostics deleted_count = row_count;
+  else
+    delete from public.bookings where id=target.id;
+    get diagnostics deleted_count = row_count;
+  end if;
+
+  return deleted_count;
+end;
+$$;
+
+revoke all on function public.delete_booking(uuid,text,boolean) from public;
+grant execute on function public.delete_booking(uuid,text,boolean) to anon, authenticated;
