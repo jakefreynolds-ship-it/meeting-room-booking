@@ -68,7 +68,6 @@ function renderCalendar(){
     full.textContent=past?"Full day unavailable":(dayBooking||eveBooking)?"Full day unavailable":"◉ Full day";
     if(!full.disabled) full.onclick=()=>openForm(date,"full_day");
     slots.appendChild(full);
-
     cal.appendChild(div);
   }
 }
@@ -88,9 +87,7 @@ function openForm(date,slot){
 
 $("weekly").onchange=e=>{
   $("endDateWrap").classList.toggle("hidden",!e.target.checked);
-  if(e.target.checked&&!$("endDate").value){
-    const d=new Date(selected.date+"T12:00:00"); d.setMonth(d.getMonth()+3); $("endDate").value=dateKey(d);
-  }
+  if(e.target.checked&&!$("endDate").value){ const d=new Date(selected.date+"T12:00:00"); d.setMonth(d.getMonth()+3); $("endDate").value=dateKey(d); }
 };
 
 $("bookingForm").onsubmit=async e=>{
@@ -99,17 +96,12 @@ $("bookingForm").onsubmit=async e=>{
   if(weekly&&!end){ $("formMessage").className="message error"; $("formMessage").textContent="Choose an end date."; return; }
   const submit=e.target.querySelector('button[type="submit"]'); submit.disabled=true;
   $("formMessage").className="message"; $("formMessage").textContent="Saving…";
-  const {data,error}=await client.rpc("create_booking_series",{
-    p_name:$("name").value.trim(), p_email:$("email").value.trim(), p_purpose:$("purpose").value.trim()||null,
-    p_start_date:selected.date, p_slot:selected.slot, p_repeat_weekly:weekly, p_end_date:end
-  });
+  const {data,error}=await client.rpc("create_booking_series",{p_name:$("name").value.trim(),p_email:$("email").value.trim(),p_purpose:$("purpose").value.trim()||null,p_start_date:selected.date,p_slot:selected.slot,p_repeat_weekly:weekly,p_end_date:end});
   submit.disabled=false;
   if(error){ $("formMessage").className="message error"; $("formMessage").textContent=error.message; return; }
   $("formMessage").className="message ok";
   $("formMessage").textContent=`Booked ${data} date${data===1?"":"s"}${selected.slot==="full_day"?" as full day":""}.`;
-  e.target.reset(); $("endDateWrap").classList.add("hidden");
-  setTimeout(()=>$("formCard").classList.add("hidden"),700);
-  await refresh();
+  e.target.reset(); $("endDateWrap").classList.add("hidden"); setTimeout(()=>$("formCard").classList.add("hidden"),700); await refresh();
 };
 
 async function loadStats(){
@@ -119,7 +111,7 @@ async function loadStats(){
   const body=$("statsBody"); body.innerHTML="";
   if(error){ body.innerHTML='<tr><td colspan="4">Could not load statistics.</td></tr>'; return; }
   const map={};
-  (data||[]).forEach(b=>{ const k=b.name.trim(); map[k]??={day:0,evening:0}; map[k][b.slot]++; });
+  (data||[]).forEach(b=>{ const k=b.name.trim(); map[k]??={day:0,evening:0}; if(b.slot==="day")map[k].day+=0.5; if(b.slot==="evening")map[k].evening+=0.5; });
   const rows=Object.entries(map).map(([name,x])=>({name,...x,total:x.day+x.evening})).sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
   if(!rows.length){ body.innerHTML='<tr><td colspan="4">No bookings this month.</td></tr>'; return; }
   rows.forEach(r=>body.insertAdjacentHTML("beforeend",`<tr><td>${esc(r.name)}</td><td>${r.day}</td><td>${r.evening}</td><td><b>${r.total}</b></td></tr>`));
