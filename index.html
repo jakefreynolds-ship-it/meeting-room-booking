@@ -16,69 +16,23 @@
       </div>
       <span id="status" class="status">Connecting…</span>
     </header>
-
-    <section class="toolbar card">
-      <button id="prev" class="secondary">←</button>
-      <strong id="monthLabel"></strong>
-      <button id="next" class="secondary">→</button>
-      <button id="todayBtn" class="secondary">Today</button>
-    </section>
-
-    <section class="card calendar-card">
-      <div id="calendar" class="calendar"></div>
-    </section>
-
+    <section class="toolbar card"><button id="prev" class="secondary">←</button><strong id="monthLabel"></strong><button id="next" class="secondary">→</button><button id="todayBtn" class="secondary">Today</button></section>
+    <section class="card calendar-card"><div id="calendar" class="calendar"></div></section>
     <section id="formCard" class="card hidden">
-      <h2>Book the room</h2>
-      <div id="selectedSummary" class="notice"></div>
+      <h2>Book the room</h2><div id="selectedSummary" class="notice"></div>
       <form id="bookingForm">
-        <div class="two">
-          <label>Name<input id="name" required maxlength="80"></label>
-          <label>Email / contact<input id="email" type="email" required maxlength="160"></label>
-        </div>
+        <div class="two"><label>Name<input id="name" required maxlength="80"></label><label>Email / contact<input id="email" type="email" required maxlength="160"></label></div>
         <label>Purpose (optional)<input id="purpose" maxlength="160" placeholder="e.g. Committee meeting"></label>
-
-        <div class="repeat-box">
-          <label class="check">
-            <input id="weekly" type="checkbox">
-            <span>Repeat every week</span>
-          </label>
-          <label id="endDateWrap" class="hidden">Repeat until
-            <input id="endDate" type="date">
-          </label>
-        </div>
-
-        <div class="actions">
-          <button type="submit">Confirm booking</button>
-          <button type="button" id="cancel" class="secondary">Cancel</button>
-        </div>
-        <p id="formMessage" class="message"></p>
+        <div class="repeat-box"><label class="check"><input id="weekly" type="checkbox"><span>Repeat every week</span></label><label id="endDateWrap" class="hidden">Repeat until<input id="endDate" type="date"></label></div>
+        <div class="actions"><button type="submit">Confirm booking</button><button type="button" id="cancel" class="secondary">Cancel</button></div><p id="formMessage" class="message"></p>
       </form>
     </section>
-
     <section class="card">
-      <div class="section-head">
-        <div>
-          <h2>Monthly usage</h2>
-          <p>How many day and evening slots each person has booked. A full-day booking counts as one Day and one Evening.</p>
-        </div>
-        <input id="statsMonth" type="month">
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Person</th><th>Day</th><th>Evening</th><th>Total</th></tr></thead>
-          <tbody id="statsBody"></tbody>
-        </table>
-      </div>
+      <div class="section-head"><div><h2>Monthly usage</h2><p>Day = 0.5, Evening = 0.5, Full day = 1. A full day contributes 0.5 to Day and 0.5 to Evening.</p></div><input id="statsMonth" type="month"></div>
+      <div class="table-wrap"><table><thead><tr><th>Person</th><th>Day</th><th>Evening</th><th>Total</th></tr></thead><tbody id="statsBody"></tbody></table></div>
     </section>
-
-    <footer>
-      <p>Bookings are shared online through Supabase. Contact emails are not shown publicly.</p>
-    </footer>
+    <footer><p>Bookings are shared online through Supabase. Contact emails are not shown publicly.</p></footer>
   </main>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="config.js"></script>
-  <script src="app.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
 </body>
 </html>
