@@ -1,6 +1,6 @@
 const SLOT_LABELS = {
-  day: "Day (09:00–17:00)",
-  evening: "Evening (17:00–22:00)",
+  day: "Day (09:00–19:00)",
+  evening: "Evening (19:00–22:00)",
   full_day: "Full day (Day + Evening)"
 };
 
