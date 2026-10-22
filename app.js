@@ -111,35 +111,25 @@ function renderStats(){
   $("statsMonthLabel").textContent=monthName;
   const daysInMonth=new Date(cursor.getFullYear(),cursor.getMonth()+1,0).getDate();
   const body=$("statsBody"); body.innerHTML="";
-  const map={};
-  let bookedDaySlots=0;
-  let bookedEveningSlots=0;
+  const counts=new Map();
+  const bookedDates=new Set();
 
   (monthBookings||[]).forEach(b=>{
-    const k=b.name.trim();
-    map[k]??={day:0,evening:0};
-    if(b.slot==="day"){
-      map[k].day+=0.5;
-      bookedDaySlots++;
-    }
-    if(b.slot==="evening"){
-      map[k].evening+=0.5;
-      bookedEveningSlots++;
-    }
+    // A full-day booking includes a day slot. Evening-only slots are informational.
+    if(b.slot!=="day" && b.slot!=="full_day") return;
+    bookedDates.add(b.booking_date);
+    const name=String(b.name||"").trim();
+    counts.set(name,(counts.get(name)||0)+1);
   });
 
-  const rows=Object.entries(map)
-    .map(([name,x])=>({name,...x,total:x.day+x.evening}))
-    .sort((a,b)=>b.total-a.total||a.name.localeCompare(b.name));
+  [...counts.entries()]
+    .sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))
+    .forEach(([name,days])=>{
+      body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip ${nameColorClass(name)}">${esc(name)}</span></td><td><b>${days}</b></td></tr>`);
+    });
 
-  rows.forEach(r=>{
-    body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip ${nameColorClass(r.name)}">${esc(r.name)}</span></td><td>${r.day}</td><td>${r.evening}</td><td><b>${r.total}</b></td></tr>`);
-  });
-
-  const unusedDay=(daysInMonth-bookedDaySlots)*0.5;
-  const unusedEvening=(daysInMonth-bookedEveningSlots)*0.5;
-  const unusedTotal=unusedDay+unusedEvening;
-  body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip person-unused">Unused</span></td><td>${unusedDay}</td><td>${unusedEvening}</td><td><b>${unusedTotal}</b></td></tr>`);
+  const unused=Math.max(0,daysInMonth-bookedDates.size);
+  body.insertAdjacentHTML("beforeend",`<tr><td><span class="person-chip person-unused">Unused</span></td><td><b>${unused}</b></td></tr>`);
 }
 
 function resetFormMode(){
